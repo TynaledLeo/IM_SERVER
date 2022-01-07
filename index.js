@@ -49,7 +49,36 @@ app.get('/', (req, res) => {
     }
 });
 
-
+//搜索用户/queryuser
+app.get('/queryuser', (req, res) => {
+    if (req.query && req.query.name ) {
+        console.log('查询名为'+req.query.name+'的用户');
+        const sql = `SELECT * FROM IM_USER WHERE IM_USER_NAME = '${req.query.name}'`
+        connection.query(sql,function(error,results){
+            if (error) {
+                console.log(error);
+                res.send('ERROR');
+                return;
+            }
+            if (results && results.length!==0) {
+                console.log(results[0]);
+                res.send({
+                    id:`${results[0].IM_USER_ID}`,
+                    name:`${results[0].IM_USER_NAME}`
+                })
+            }else{
+                res.send("ERROR")
+                console.log("查询失败");
+                return;
+            }
+            return;
+        })
+    }else{
+        console.log("5");
+        res.send("ERROR");
+        return;
+    }
+});
 
 // POST请求
 // /login登录
