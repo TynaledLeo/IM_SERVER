@@ -90,12 +90,21 @@ app.get('/getFriendList',(req,res)=> {
         if(error){
             throw error;
         }else{
-            queryResultList1 = results;
+            queryResultList1 = results.map((item)=>{
+                return {
+                  name: item['USER_2']
+                }
+              })
             connection.query(query2,function (error,results) {
                 if(error){
                     throw error;
                 }else{
-                queryResultList2 = results.concat(queryResultList1);
+                let temp = results.map((item)=>{
+                    return {
+                      name: item['USER_1']
+                    }
+                  }) 
+                queryResultList2 = temp.concat(queryResultList1);
                 console.log(queryResultList2);
                 console.log("以上数据已经返回给了客户端");
                 res.send(queryResultList2);
