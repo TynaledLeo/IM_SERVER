@@ -5,16 +5,6 @@ const app = express();
 const os = require('os');
 const mysql = require('mysql');
 
-
-//数据库配置
-var connection = mysql.createConnection({
-  host     : '42.193.107.6',
-  user     : 'root',
-  password : 'root',
-  database : 'IM'
-});
-connection.connect();
-
 // 组装
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -24,6 +14,16 @@ console.log('架构：',os.arch());
 console.log('操作系统：',os.type(),os.platform(),os.release());
 console.log('负载：',os.freemem()/os.totalmem());
 
+//数据库配置
+var connection = mysql.createConnection({
+    host     : '42.193.107.6',
+    user     : 'root',
+    password : 'root',
+    database : 'IM'
+  });
+  connection.connect();
+  console.log("成功与数据库建立了连接");
+  
 
 //设置允许跨域
 app.all("*",function(req,res,next){
@@ -52,7 +52,7 @@ app.get('/', (req, res) => {
 //搜索用户/queryuser
 app.get('/queryuser', (req, res) => {
     if (req.query && req.query.name ) {
-        console.log('查询名为'+req.query.name+'的用户');
+        console.log('查询名为'+req.query.name+'的用户：');
         const sql = `SELECT * FROM IM_USER WHERE IM_USER_NAME = '${req.query.name}'`
         connection.query(sql,function(error,results){
             if (error) {
@@ -80,13 +80,39 @@ app.get('/queryuser', (req, res) => {
     }
 });
 
+//getFriendList
+app.get('/getFriendList',(req,res)=> {
+    console.log('正在请求'+req.query.name+'的好友列表：');
+    const query1 = `SELECT USER_2 FROM IM_FRIEND WHERE USER_1 = '${req.query.name}' AND IS_CONFIRM = '1'`
+    const query2 = `SELECT USER_1 FROM IM_FRIEND WHERE USER_2 = '${req.query.name}' AND IS_CONFIRM = '1'`
+    let queryResultList1,queryResultList2;
+    connection.query(query1,function (error,results) {
+        if(error){
+            throw error;
+        }else{
+            queryResultList1 = results;
+            connection.query(query2,function (error,results) {
+                if(error){
+                    throw error;
+                }else{
+                queryResultList2 = results.concat(queryResultList1);
+                console.log(queryResultList2);
+                console.log("以上数据已经返回给了客户端");
+                res.send(queryResultList2);
+                }
+            })
+        }
+    })
+
+})
+
 // POST请求
 // /login登录
 app.post('/login', (req, res) => {
     const current = new Date();
     let username = req.body.username;
     let password = req.body.password;
-	console.log(username+'请求登录');
+	console.log(username+'请求登录：');
     let query = `SELECT IM_USER_PASSWORD FROM IM_USER WHERE IM_USER_NAME = '${username}'`;  
     connection.query(query, function (error, results) {
 
@@ -110,5 +136,5 @@ app.post('/login', (req, res) => {
 
 let server = app.listen(8642, function () {
   const port = server.address().port
-  console.log(">_服务已经在%s端口开启", port)
+  console.log("服务已经在%s端口开启：", port)
 })
