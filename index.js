@@ -4,6 +4,38 @@ const bodyParser = require('body-parser');
 const app = express();
 const os = require('os');
 const mysql = require('mysql');
+const http = require('http');
+const imserver = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(imserver);
+
+//IM服务
+io.on('connection', (socket) => {
+
+    console.log('有客户端接入了IM服务:');
+
+    socket.on('disconnect',() => {   // 断开连接的监听要放在连接监听里面
+        console.log('有客户端断开了IM服务:');
+    });
+
+    socket.on('send_channel',(re)=>{
+        const sender = re.from;
+        const reciver = re.to;
+        const msg = re.msg; 
+        console.log(sender,reciver,msg);
+
+        io.emit(`recv_${reciver}`,msg);
+    })
+
+
+
+});
+  
+imserver.listen(2468, () => {
+    console.log('IM服务在2468端口开启:');
+});
+
+
 
 // 组装
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -115,6 +147,21 @@ app.get('/getFriendList',(req,res)=> {
 
 })
 
+// /getMsgList
+app.get('/getMsgList',(req,res)=>{
+    console.log(`${req.query.from}查询了与${req.query.to}的消息记录`);
+    let query = `SELECT * FROM IM_MSG_DOCK WHERE IM_MSG_FROM = '${req.query.from}' AND IM_MSG_TO = '${req.query.to}' OR WHERE IM_MSG_FROM = '${req.query.to}' AND IM_MSG_TO = '${req.query.from}'`;  
+    connection.query(query, function (error,results){
+        if (error) {
+            throw error;
+        }else{
+            console.log(results);
+        }
+    })
+    res.send("OK");
+})
+
+
 // POST请求
 // /login登录
 app.post('/login', (req, res) => {
@@ -145,5 +192,5 @@ app.post('/login', (req, res) => {
 
 let server = app.listen(8642, function () {
   const port = server.address().port
-  console.log("服务已经在%s端口开启：", port)
+  console.log("主服务已经在%s端口开启：", port)
 })
