@@ -18,43 +18,90 @@ const io = new Server(imserver);
 // }
 
 
+const onlineUser = {};
 
-//IM服务
-io.on('connection', (socket) => {
 
-    console.log('有客户端接入了IM服务:');
+const SIOS = (socket) => {
 
-    socket.on('disconnect',() => {   // 断开连接的监听要放在连接监听里面
-        console.log('有客户端断开了IM服务:');
-    });
-//通讯接收流道
-    socket.on('msg',(re)=>{
-        const sender = re.from;
-        const receiver = re.to;
-        const msg = re.msg; 
 
-// 存储消息记录 
-        let query = 'INSERT INTO im.im_msg_list (IM_MSG_FROM, IM_MSG_TO, IM_MSG_ISREAD, IM_MSG, IM_MSG_TS) VALUES (?, ?, DEFAULT, ?, DEFAULT)'
-        let queryParam = [sender,receiver,msg]
-        console.log(sender+'向'+receiver+'发送了消息：'+msg);
-        connection.query(query,queryParam,function (error,results) {
-            if (error) {
-                console.log(error);
-            }else{
-                console.log(results);
-            }
-        })
-//
-// 日志记录
+// 消息
+socket.on('msg',query=>{
+    console.log(query);
+    if (!onlineUser[query.to]) {
+        io.to(onlineUser[query.from]).emit(`notice`,`${query.to}目前离线,可能无法立刻收到您的信息`);
+    }
+    // 存储消息记录 
+    let iquery = 'INSERT INTO im.im_msg_list (IM_MSG_FROM, IM_MSG_TO, IM_MSG_ISREAD, IM_MSG, IM_MSG_TS) VALUES (?, ?, DEFAULT, ?, DEFAULT)'
+    let iqueryParam = [query.from,query.to,query.msg]
+    connection.query(iquery,iqueryParam,function (error,results) {
+        if (error) {
+            console.log(error);
+        }else{
+            //向指定接收方发送消息
+            io.to(onlineUser[query.to]).emit(`recv`,query);
+            io.to(onlineUser[query.from]).emit(`notice`,1);
 
-//向指定接收方发送消息
-        io.emit(`msg_${receiver}`,{
-            msg:msg,
-            from:sender
-        });
+        }
     })
 
-});
+
+})
+//登录
+socket.on('login',user=>{
+    console.log(socket.id);
+    console.log(user);
+    // 注册在线用户表
+    onlineUser[user] = socket.id;
+})
+
+    socket.on('disconnect',(socket) => {   // 断开连接的监听要放在连接监听里面
+        console.log(socket);
+    });
+
+    socket.on('logoff',user=>{
+        
+    })
+}
+
+io.on('connection', SIOS);
+console.log('SIOS READY');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//IM服务
+// io.on('connection', (socket) => {
+
+//     console.log('有客户端接入了IM服务:');
+//     console.log(io.sockets.sockets);
+//     console.log(socket.id);
+//     socket.on('disconnect',() => {   // 断开连接的监听要放在连接监听里面
+//         console.log('有客户端断开了IM服务:');
+//     });
+// //通讯接收流道
+//     socket.on('msg',(re)=>{
+//         console.log(re);
+//         const sender = re.from;
+//         const receiver = re.to;
+//         const msg = re.msg; 
+//         const recv = 'msg_'+receiver;
+//
+// // 日志记录
+//     })
+
+// });
   
 imserver.listen(2468, () => {
     console.log('IM服务在2468端口开启:');
@@ -92,11 +139,16 @@ app.all("*",function(req,res,next){
     res.header("Access-Control-Allow-Headers","content-type");
     //跨域允许的请求方式 
     res.header("Access-Control-Allow-Methods","DELETE,PUT,POST,GET,OPTIONS");
+
     if (req.method.toLowerCase() == 'options')
         res.send(200);  //让options尝试请求快速结束
     else
         next();
 })
+
+
+
+
 
 
 
@@ -197,9 +249,13 @@ app.get('/getFriendList',(req,res)=> {
 
 // /getMsgList
 app.get('/getMsgList',(req,res)=>{
+
     console.log(`${req.query.from}查询了与${req.query.to}的消息记录`);
-    let query = `SELECT * FROM IM_MSG_DOCK WHERE ( IM_MSG_FROM = '${req.query.from}' AND IM_MSG_TO = '${req.query.to}') OR (IM_MSG_FROM = '${req.query.to}' AND IM_MSG_TO = '${req.query.from}')`;  
-    connection.query(query, function (error,results){
+    const f = req.query.from;
+    const t = req.query.to;
+    let query = ' SELECT * FROM IM_MSG_LIST WHERE ( IM_MSG_FROM = ? AND IM_MSG_TO = ? ) OR (IM_MSG_FROM = ? AND IM_MSG_TO = ? ) ORDER BY IM_MSG_TS ';  
+    const queryParam = [ f,t,t,f ]
+    connection.query(query,queryParam,function (error,results){
         if (error) {
             res.send(error);
         }else{
@@ -276,7 +332,15 @@ app.post('/reg',(req,res)=>{
 
 //offline
 app.post('/offline',(req,res)=>{
-
+    let sqlParam = [res.body.name];
+    let sql = 'UPDATE im.im_user t SET t.IM_USER_STATUS_ID = 2 WHERE t.IM_USER_NAME = ?'
+    connection.query(sql,sqlParam,function (err,results) {
+        if (err) {
+            console.log(err);
+        }else{
+            console.log(results);
+        }
+    })
     res.send("?")
 
 })
